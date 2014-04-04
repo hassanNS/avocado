@@ -22,6 +22,7 @@ from avocado.query.translators import registry as translators
 from avocado.query.operators import registry as operators
 from avocado.lexicon.models import Lexicon
 from avocado.stats.agg import Aggregator
+from avocado import stats
 from avocado import formatters
 
 
@@ -553,6 +554,16 @@ class DataField(BasePlural, PublishArchiveMixin):
     coded_choices = coded_labels
 
     # Data Aggregation Properties
+    @cached_method(version='data_version')
+    def stats(self, *args, **kwargs):
+        "Returns a dict of stats."
+        return dict(stats.summary(self, *args, **kwargs))
+
+    @cached_method(version='data_version')
+    def dist(self, *args, **kwargs):
+        "Returns a distribution count of values."
+        return tuple(stats.distribution(self, *args, **kwargs))
+
     def groupby(self, *args):
         return Aggregator(self.field).groupby(*args)
 
@@ -599,16 +610,7 @@ class DataField(BasePlural, PublishArchiveMixin):
     def sparsity(self, *args, **kwargs):
         "Returns the ratio of null values in the population."
         queryset = self.model.objects.all()
-        count = queryset.count()
-
-        # No data, 100% sparsity
-        if count == 0:
-            return 1.0
-
-        isnull = '{0}__isnull'.format(self.value_field_name)
-        nulls = queryset.filter(**{isnull: True}).count()
-
-        return nulls / float(count)
+        return stats.sparsity(queryset, fields=(self.field_name,))
 
     # Translator Convenience Methods
     @property
